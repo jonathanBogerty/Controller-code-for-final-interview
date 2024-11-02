@@ -1,0 +1,72 @@
+import serial
+import time
+
+# Initialize serial communication
+ser = serial.Serial('COM5', 9600)
+
+# Define joystick settings
+class JoystickSettings:
+    def __init__(self, sensitivity=5, deadzone=50):  # Default values
+        self.sensitivity = sensitivity
+        self.deadzone = deadzone
+
+    def update_settings(self, sensitivity=None, deadzone=None):
+        if sensitivity is not None:
+            self.sensitivity = sensitivity
+            print(f"Sensitivity updated to: {self.sensitivity}")
+        if deadzone is not None:
+            self.deadzone = deadzone
+            print(f"Deadzone updated to: {self.deadzone}")
+
+    def __str__(self):
+        return f"Current Settings - Sensitivity: {self.sensitivity}, Deadzone: {self.deadzone}"
+
+# Initialize joystick settings
+joystick_settings = JoystickSettings()
+
+def apply_deadzone(value, deadzone, center=512):
+    if abs(value - center) < deadzone:
+        return center
+    return value
+
+# Log function for joystick actions
+def log_joystick_action(action):
+    with open('joystick_log.txt', 'a') as log_file:
+        log_file.write(f"{time.time()}: {action}\n")
+
+while True:
+    if ser.in_waiting > 0:
+        line = ser.readline().decode('utf-8').strip()
+        print(f"Received: {line}")  # Debug print
+
+        if line == "BUTTON":
+            print("Button pressed")
+            log_joystick_action("Button pressed")
+        elif line == "NO_BUTTON":
+            print("Button not pressed")
+            log_joystick_action("Button not pressed")
+        elif line.startswith("x = "):
+            try:
+                # Parse x and y values from the line
+                parts = line.split(", ")
+                x_part = parts[0].split(" = ")[1]
+                y_part = parts[1].split(" = ")[1]
+                x = int(x_part)
+                y = int(y_part)
+                print(f"Joystick x: {x}, y: {y}")  # Debug print
+
+                # Apply deadzone using current settings
+                x = apply_deadzone(x, joystick_settings.deadzone)
+                y = apply_deadzone(y, joystick_settings.deadzone)
+
+                # Map Arduino joystick values (0-1023) to your desired range (example 0-1)
+                mapped_x = (x - 0) / (1023 - 0) * (1 - 0) + 0
+                mapped_y = (y - 0) / (1023 - 0) * (1 - 0) + 0
+
+                # Print mapped values (or use them in your game logic)
+                print(f"Mapped Joystick x: {mapped_x:.2f}, y: {mapped_y:.2f}")
+                log_joystick_action(f"Joystick x: {mapped_x:.2f}, y: {mapped_y:.2f}")
+
+            except (IndexError, ValueError) as e:
+                print(f"Error parsing joystick values: {e}")
+                log_joystick_action(f"Error parsing joystick values: {e}")
